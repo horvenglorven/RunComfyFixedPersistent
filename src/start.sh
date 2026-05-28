@@ -49,27 +49,28 @@ fi
 COMFYUI_DIR="/ComfyUI"
 PERSIST_ROOT="$NETWORK_VOLUME/ComfyUI"
 WORKFLOW_DIR="$PERSIST_ROOT/user/default/workflows"
-CUSTOM_NODES_DIR="$COMFYUI_DIR/custom_nodes"
 
-mkdir -p "$PERSIST_ROOT/models" "$PERSIST_ROOT/user" \
+# Keep the ComfyUI source code in the image at /ComfyUI, but force all
+# mutable/runtime folders into persistent storage. This prevents Manager,
+# custom-node installs, model downloads, inputs, outputs, and workflows
+# from disappearing after a pod rebuild/reboot.
+CUSTOM_NODES_DIR="$PERSIST_ROOT/custom_nodes"
+MODELS_DIR="$PERSIST_ROOT/models"
+
+mkdir -p "$MODELS_DIR" "$PERSIST_ROOT/user" \
          "$PERSIST_ROOT/output" "$PERSIST_ROOT/input" \
-         "$PERSIST_ROOT/custom_nodes"
+         "$CUSTOM_NODES_DIR"
 
-# Symlink user/output/input into /ComfyUI so ComfyUI uses its default
-# code paths (passing --user-directory triggers a None-user_dir bug in
-# user_manager.get_users on the current ComfyUI revision). Models +
-# custom_nodes still go through extra_model_paths.yaml (below) because
-# we want the *additive* behavior — image-baked custom_nodes + user
-# additions — not a wholesale replacement.
 if [ "$NETWORK_VOLUME" != "/" ]; then
-    # First boot only: migrate baked user/ content (default templates,
-    # schema) to the volume before swapping in the symlink. cp -an is
-    # no-clobber, so re-runs on existing volumes are safe.
-    if [ -d "$COMFYUI_DIR/user" ] && [ ! -L "$COMFYUI_DIR/user" ]; then
-        cp -an "$COMFYUI_DIR/user/." "$PERSIST_ROOT/user/" 2>/dev/null || true
-        rm -rf "$COMFYUI_DIR/user"
-    fi
-    for sub in user output input; do
+    # Migrate baked/default Comfy folders into /workspace once, then replace
+    # the root-level folders with symlinks. cp -an is no-clobber, so this is
+    # safe across restarts and preserves anything already on the volume.
+    for sub in user output input models custom_nodes; do
+        if [ -d "$COMFYUI_DIR/$sub" ] && [ ! -L "$COMFYUI_DIR/$sub" ]; then
+            mkdir -p "$PERSIST_ROOT/$sub"
+            cp -an "$COMFYUI_DIR/$sub/." "$PERSIST_ROOT/$sub/" 2>/dev/null || true
+            rm -rf "$COMFYUI_DIR/$sub"
+        fi
         [ -L "$COMFYUI_DIR/$sub" ] || rm -rf "$COMFYUI_DIR/$sub" 2>/dev/null || true
         ln -sfn "$PERSIST_ROOT/$sub" "$COMFYUI_DIR/$sub"
     done
@@ -196,7 +197,7 @@ else
         --registry /models_registry.json \
         --workflows-src /comfyui-wan/workflows \
         --workflows-dst "$WORKFLOW_DIR" \
-        --models-root "$NETWORK_VOLUME/ComfyUI/models" \
+        --models-root "$MODELS_DIR" \
         --manifest "$HF_QUEUE_FILE" \
         "${PROVISIONER_FLAGS[@]}"
 
@@ -205,8 +206,8 @@ else
 fi
 
 declare -A MODEL_CATEGORIES=(
-    ["$NETWORK_VOLUME/ComfyUI/models/checkpoints"]="$CHECKPOINT_IDS_TO_DOWNLOAD"
-    ["$NETWORK_VOLUME/ComfyUI/models/loras"]="$LORAS_IDS_TO_DOWNLOAD"
+    ["$MODELS_DIR/checkpoints"]="$CHECKPOINT_IDS_TO_DOWNLOAD"
+    ["$MODELS_DIR/loras"]="$LORAS_IDS_TO_DOWNLOAD"
 )
 
 # Counter to track background jobs
@@ -249,10 +250,10 @@ echo "All downloads completed!"
 
 
 echo "Downloading upscale models"
-mkdir -p "$NETWORK_VOLUME/ComfyUI/models/upscale_models"
-if [ ! -f "$NETWORK_VOLUME/ComfyUI/models/upscale_models/4xLSDIR.pth" ]; then
+mkdir -p "$MODELS_DIR/upscale_models"
+if [ ! -f "$MODELS_DIR/upscale_models/4xLSDIR.pth" ]; then
     if [ -f "/4xLSDIR.pth" ]; then
-        mv "/4xLSDIR.pth" "$NETWORK_VOLUME/ComfyUI/models/upscale_models/4xLSDIR.pth"
+        mv "/4xLSDIR.pth" "$MODELS_DIR/upscale_models/4xLSDIR.pth"
         echo "Moved 4xLSDIR.pth to the correct location."
     else
         echo "4xLSDIR.pth not found in the root directory."
@@ -263,7 +264,7 @@ fi
 
 # 2xLiveActionV1_SPAN — direct download (raw GitHub, not on HF, so not
 # part of the model registry/provisioner).
-LIVEACTION_DEST="$NETWORK_VOLUME/ComfyUI/models/upscale_models/2xLiveActionV1_SPAN_490000.pth"
+LIVEACTION_DEST="$MODELS_DIR/upscale_models/2xLiveActionV1_SPAN_490000.pth"
 if [ ! -f "$LIVEACTION_DEST" ]; then
     echo "Downloading 2xLiveActionV1_SPAN..."
     aria2c -x 8 -s 8 --console-log-level=warn --summary-interval=0 \
@@ -355,10 +356,13 @@ if ! /opt/venv/bin/python -c \
 fi
 
 echo "Renaming loras downloaded as zip files to safetensors files"
-cd $LORAS_DIR
-for file in *.zip; do
+LORAS_DIR="${LORAS_DIR:-$MODELS_DIR/loras}"
+mkdir -p "$LORAS_DIR"
+shopt -s nullglob
+for file in "$LORAS_DIR"/*.zip; do
     mv "$file" "${file%.zip}.safetensors"
 done
+shopt -u nullglob
 
 # Wait for SageAttention build to complete
 echo "Waiting for SageAttention build to complete..."

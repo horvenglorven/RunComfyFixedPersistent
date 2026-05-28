@@ -89,6 +89,7 @@ RUN for repo in \
     https://github.com/BadCafeCode/masquerade-nodes-comfyui.git \
     https://github.com/1038lab/ComfyUI-RMBG.git \
     https://github.com/M1kep/ComfyLiterals.git \
+    https://github.com/KBYSHanahira/Civicomfy.git \ 
     https://github.com/city96/ComfyUI-GGUF.git; \
     do \
         cd /ComfyUI/custom_nodes; \
@@ -131,3 +132,4 @@ RUN chmod +x /start_script.sh
 COPY 4xLSDIR.pth /4xLSDIR.pth
 
 CMD ["/start_script.sh"]
+

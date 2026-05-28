@@ -6,7 +6,7 @@
 # reflect what's on the repo.
 set -e
 REPO_DIR=/comfyui-wan
-REPO_URL=https://github.com/Hearmeman24/comfyui-wan.git
+REPO_URL=https://github.com/horvenglorven/RunComfyFixedPersistent.git
 if [ -d "$REPO_DIR/.git" ]; then
     git -C "$REPO_DIR" fetch --depth=1 origin master
     git -C "$REPO_DIR" reset --hard origin/master

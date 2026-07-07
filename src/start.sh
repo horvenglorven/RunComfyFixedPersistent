@@ -151,6 +151,7 @@ rm -rf CivitAI_Downloader  # Clean up the cloned repo
 
 # Custom nodes to provision at boot. Format: "<git-url>" or "<git-url>|<pinned-sha>".
 CUSTOM_NODE_REPOS=(
+    "https://github.com/ltdrdata/ComfyUI-Manager.git"
     "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
     "https://github.com/kijai/ComfyUI-KJNodes.git|204f6d5"
     "https://github.com/wildminder/ComfyUI-VibeVoice.git"

@@ -90,6 +90,16 @@ mkdir -p "$PERSIST_ROOT/models" "$PERSIST_ROOT/user" \
          "$PERSIST_ROOT/output" "$PERSIST_ROOT/input" \
          "$PERSIST_ROOT/custom_nodes"
 
+# Persist custom_nodes too: copy baked nodes on first boot, then symlink.
+if [ "$NETWORK_VOLUME" != "/" ]; then
+    if [ -d "$COMFYUI_DIR/custom_nodes" ] && [ ! -L "$COMFYUI_DIR/custom_nodes" ]; then
+        cp -an "$COMFYUI_DIR/custom_nodes/." "$PERSIST_ROOT/custom_nodes/" 2>/dev/null || true
+        rm -rf "$COMFYUI_DIR/custom_nodes"
+    fi
+
+    ln -sfn "$PERSIST_ROOT/custom_nodes" "$COMFYUI_DIR/custom_nodes"
+fi
+
 # Symlink user/output/input into /ComfyUI so ComfyUI uses its default
 # code paths (passing --user-directory triggers a None-user_dir bug in
 # user_manager.get_users on the current ComfyUI revision). Models +
@@ -360,7 +370,7 @@ update_policy = stable-comfyui
 windows_selector_event_loop_policy = False
 model_download_by_agent = False
 downgrade_blacklist =
-security_level = normal
+security_level = weak
 skip_migration_check = False
 always_lazy_install = False
 network_mode = public
@@ -369,6 +379,7 @@ EOL
 else
     echo "config.ini already exists. Updating preview_method..."
     sed -i 's/^preview_method = .*/preview_method = auto/' "$CONFIG_FILE"
+    sed -i 's/^security_level = .*/security_level = weak/' "$CONFIG_FILE"
 fi
 echo "Config file setup complete!"
     echo "Default preview method updated to 'auto'"
@@ -437,6 +448,7 @@ fi
 echo "▶️  Starting ComfyUI"
 
 nohup python3 "$COMFYUI_DIR/main.py" --listen --enable-cors-header '*' $SAGE_FLAG \
+    --enable-triton-backend \
     $EXTRA_PATHS_FLAG \
     > "$NETWORK_VOLUME/comfyui_${RUNPOD_POD_ID}_nohup.log" 2>&1 &
 

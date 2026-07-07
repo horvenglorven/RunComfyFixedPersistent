@@ -86,6 +86,24 @@ PERSIST_ROOT="$NETWORK_VOLUME/ComfyUI"
 WORKFLOW_DIR="$PERSIST_ROOT/user/default/workflows"
 CUSTOM_NODES_DIR="$COMFYUI_DIR/custom_nodes"
 
+# Update ComfyUI core on boot.
+# Needed for newer model support such as Krea 2 / ComfyUI 0.27+.
+echo "Updating ComfyUI core..."
+if [ -d "$COMFYUI_DIR/.git" ]; then
+    git -C "$COMFYUI_DIR" pull --ff-only || echo "⚠️ ComfyUI core update failed; continuing with baked version."
+
+    if [ -f "$COMFYUI_DIR/requirements.txt" ]; then
+        echo "Installing ComfyUI core requirements without changing torch..."
+        if [ -f /torch-constraint.txt ]; then
+            pip install -r "$COMFYUI_DIR/requirements.txt" --constraint /torch-constraint.txt || true
+        else
+            pip install -r "$COMFYUI_DIR/requirements.txt" || true
+        fi
+    fi
+else
+    echo "⚠️ $COMFYUI_DIR is not a git repo; skipping ComfyUI core update."
+fi
+
 mkdir -p "$PERSIST_ROOT/models" "$PERSIST_ROOT/user" \
          "$PERSIST_ROOT/output" "$PERSIST_ROOT/input" \
          "$PERSIST_ROOT/custom_nodes"

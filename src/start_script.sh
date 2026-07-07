@@ -11,7 +11,7 @@
 # backoff, and if GitHub stays unreachable we fall back to whatever repo
 # copy is already on disk rather than bricking the pod.
 REPO_DIR=/comfyui-wan
-REPO_URL=https://github.com/Hearmeman24/comfyui-wan.git
+REPO_URL=https://github.com/horvenglorven/RunComfyFixedPersistent.git
 
 sync_repo() {
     if [ -d "$REPO_DIR/.git" ]; then

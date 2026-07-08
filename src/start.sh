@@ -108,14 +108,16 @@ mkdir -p "$PERSIST_ROOT/models" "$PERSIST_ROOT/user" \
          "$PERSIST_ROOT/output" "$PERSIST_ROOT/input" \
          "$PERSIST_ROOT/custom_nodes"
 
-# Persist custom_nodes too: copy baked nodes on first boot, then symlink.
+# Persist models and custom_nodes too: copy baked content on first boot, then symlink.
 if [ "$NETWORK_VOLUME" != "/" ]; then
-    if [ -d "$COMFYUI_DIR/custom_nodes" ] && [ ! -L "$COMFYUI_DIR/custom_nodes" ]; then
-        cp -an "$COMFYUI_DIR/custom_nodes/." "$PERSIST_ROOT/custom_nodes/" 2>/dev/null || true
-        rm -rf "$COMFYUI_DIR/custom_nodes"
-    fi
+    for sub in models custom_nodes; do
+        if [ -d "$COMFYUI_DIR/$sub" ] && [ ! -L "$COMFYUI_DIR/$sub" ]; then
+            cp -an "$COMFYUI_DIR/$sub/." "$PERSIST_ROOT/$sub/" 2>/dev/null || true
+            rm -rf "$COMFYUI_DIR/$sub"
+        fi
 
-    ln -sfn "$PERSIST_ROOT/custom_nodes" "$COMFYUI_DIR/custom_nodes"
+        ln -sfn "$PERSIST_ROOT/$sub" "$COMFYUI_DIR/$sub"
+    done
 fi
 
 # Symlink user/output/input into /ComfyUI so ComfyUI uses its default
@@ -162,7 +164,7 @@ network_volume:
     latent_upscale_models: models/latent_upscale_models
     detection: models/detection
     vae: models/vae
-    custom_nodes: custom_nodes
+    
 EOF
     EXTRA_PATHS_FLAG="--extra-model-paths-config $COMFYUI_DIR/extra_model_paths.yaml"
 else
@@ -207,6 +209,18 @@ for entry in "${CUSTOM_NODE_REPOS[@]}"; do
     fi
 done
 
+safe_pip_install_requirements() {
+    req="$1"
+    if [ -f "$req" ]; then
+        echo "🧹 Stripping CuPy from $req if present..."
+        sed -i '/^[[:space:]]*cupy/d;/^[[:space:]]*cupy-cuda/d' "$req"
+        pip install -r "$req"
+    else
+        echo "⚠️ Requirements file not found: $req"
+        return 1
+    fi
+}
+
 # OpenRouter node — provisioned alongside the Wan Animate and SCAIL-2 flows.
 OPENROUTER_PID=""
 if [ "$download_wan_animate" = "true" ] || [ "$DOWNLOAD_SCAIL2" = "true" ]; then
@@ -226,19 +240,19 @@ fi
 
 
 echo "🔧 Installing KJNodes packages..."
-pip install -r $CUSTOM_NODES_DIR/ComfyUI-KJNodes/requirements.txt &
+safe_pip_install_requirements "$CUSTOM_NODES_DIR/ComfyUI-KJNodes/requirements.txt" &
 KJ_PID=$!
 
 echo "🔧 Installing WanVideoWrapper packages..."
-pip install -r $CUSTOM_NODES_DIR/ComfyUI-WanVideoWrapper/requirements.txt &
+safe_pip_install_requirements "$CUSTOM_NODES_DIR/ComfyUI-WanVideoWrapper/requirements.txt" &
 WAN_PID=$!
 
 echo "🔧 Installing VibeVoice packages..."
-pip install -r $CUSTOM_NODES_DIR/ComfyUI-VibeVoice/requirements.txt &
+safe_pip_install_requirements "$CUSTOM_NODES_DIR/ComfyUI-VibeVoice/requirements.txt" &
 VIBE_PID=$!
 
 echo "🔧 Installing WanAnimatePreprocess packages..."
-pip install -r $CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess/requirements.txt &
+safe_pip_install_requirements "$CUSTOM_NODES_DIR/ComfyUI-WanAnimatePreprocess/requirements.txt" &
 WAN_ANIMATE_PID=$!
 
 echo "🔧 Installing comfy-aimdo + comfy-kitchen..."

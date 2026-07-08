@@ -126,6 +126,7 @@ RUN for repo in \
             git clone "$repo"; \
         fi; \
         if [ -f "/ComfyUI/custom_nodes/$repo_dir/requirements.txt" ]; then \
+            sed -i '/^[[:space:]]*cupy/d;/^[[:space:]]*cupy-cuda/d' "/ComfyUI/custom_nodes/$repo_dir/requirements.txt"; \
             pip install -r "/ComfyUI/custom_nodes/$repo_dir/requirements.txt" \
                 --constraint /torch-constraint.txt; \
         fi; \

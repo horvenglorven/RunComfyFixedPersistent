@@ -182,8 +182,9 @@ rm -rf CivitAI_Downloader  # Clean up the cloned repo
 # Custom nodes to provision at boot. Format: "<git-url>" or "<git-url>|<pinned-sha>".
 CUSTOM_NODE_REPOS=(
     "https://github.com/ltdrdata/ComfyUI-Manager.git"
+    "https://github.com/rgthree/rgthree-comfy.git"
     "https://github.com/kijai/ComfyUI-WanVideoWrapper.git"
-    "https://github.com/kijai/ComfyUI-KJNodes.git|204f6d5"
+    "https://github.com/kijai/ComfyUI-KJNodes.git"
     "https://github.com/wildminder/ComfyUI-VibeVoice.git"
     "https://github.com/kijai/ComfyUI-WanAnimatePreprocess.git"
     "https://github.com/obisin/ComfyUI-FSampler.git"
@@ -202,7 +203,7 @@ for entry in "${CUSTOM_NODE_REPOS[@]}"; do
         git clone "$url" "$dir"
     else
         echo "Updating $name"
-        git -C "$dir" pull
+        git -C "$dir" pull --ff-only
     fi
     if [ -n "$pin" ]; then
         git -C "$dir" reset --hard "$pin"
@@ -379,7 +380,7 @@ cd /
 if [ "$change_preview_method" == "true" ]; then
     echo "Updating default preview method..."
     sed -i '/id: *'"'"'VHS.LatentPreview'"'"'/,/defaultValue:/s/defaultValue: false/defaultValue: true/' $CUSTOM_NODES_DIR/ComfyUI-VideoHelperSuite/web/js/VHS.core.js
-    CONFIG_PATH="$PERSIST_ROOT/user/default/ComfyUI-Manager"
+    CONFIG_PATH="$PERSIST_ROOT/user/__manager"
     CONFIG_FILE="$CONFIG_PATH/config.ini"
 
 # Ensure the directory exists
